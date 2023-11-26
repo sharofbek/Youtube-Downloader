@@ -4,7 +4,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const { IgApiClient } = require('instagram-private-api');
 const ig = new IgApiClient();
 
-const bot = new Telegraf('6617361523:AAFPCo0mQzc5pX3B8yD38Ip1F9thYRRhR4c');
+const bot = new Telegraf('6756911285:AAHVp09_cWvJxVYwi2j32cvz7xA35jJL_p0');
 
 bot.start((ctx) => {
   ctx.reply("Salom! YouTube-dan video yuklab olish uchun video URLini jo'nating.");
@@ -73,7 +73,8 @@ bot.action(/format_/i, async (ctx) => {
   const formatIndex = parseInt(ctx.callbackQuery.data.split('_')[1]);
   const { url, title, formats } = userSpecificData;
 
-  ctx.answerCbQuery();
+  // Yana yangi callback buyrug'ini yuborish
+  await ctx.answerCbQuery(); // Yangi buyruq
 
   if (isNaN(formatIndex) || formatIndex < 0 || formatIndex >= formats.length) {
     ctx.reply("Noto'g'ri format tanlangan. Iltimos, qayta urinib ko'ring.");
@@ -85,6 +86,11 @@ bot.action(/format_/i, async (ctx) => {
   // Loader belgisini yuborish
   const loaderMsg = await ctx.reply("⏳ Video yuklanmoqda, iltimos kuting...");
 
+  const MAX_RETRIES = 3;
+let retries = 0;
+let downloadSuccess = false;
+
+while (retries < MAX_RETRIES && !downloadSuccess) {
   try {
     const downloadOptions = { format: videoFormat };
     await ctx.replyWithVideo(
@@ -96,19 +102,19 @@ bot.action(/format_/i, async (ctx) => {
         reply_to_message_id: ctx.callbackQuery.message.message_id,
       },
     );
-
-    // Loader belgisini o'chirish
-    ctx.telegram.deleteMessage(loaderMsg.chat.id, loaderMsg.message_id);
+    downloadSuccess = true;
   } catch (error) {
     console.error(error);
-
-    // Hatolik yuz berishi mumkin bo'lganida loader belgisini o'chirish
-    ctx.telegram.deleteMessage(loaderMsg.chat.id, loaderMsg.message_id);
-
-    ctx.reply("Hatolik yuz berdi. Iltimos, boshqa YouTube video URLini yuboring.");
-  } finally {
-    userData.set(chatID, { ...userSpecificData, hearing: false });
+    retries++;
+    // Kutishdan oldin qayta urinish (ixtiyoriy)
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Ma'lumotlarni o'zgartirib ko'ring
   }
+}
+
+if (!downloadSuccess) {
+  // Xatolik yuzaga keldi keyin o'tkazishni qayta urin
+  ctx.reply("Bir nechta urinishdan so'ng ham videoni yuklab olishda muvaffaqiyatli bo'lmadi. Iltimos, keyinroq qayta urin.");
+}
 
   
 });
